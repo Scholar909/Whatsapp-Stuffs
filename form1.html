@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Submit Link & Comment</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>Submit Link + Comment</h2>
+    <form id="submissionForm">
+      <label for="nickname">Nickname (unchangeable):</label>
+      <input type="text" id="nickname" required />
+
+      <div id="linkCommentPairs">
+        <div class="pair">
+          <input type="url" name="link" placeholder="Enter Link" class="link" required />
+          <textarea name="comment" placeholder="Enter Comment" class="comment" required></textarea>
+        </div>
+      </div>
+
+      
+      <button type="submit">Submit</button>
+      <button type="button" id="addPairBtn">Add Another Link + Comment</button>
+    </form>
+    <p id="status"></p>
+  </div>
+
+  <script type="module" src="submit.js"></script>
+</body>
+</html>

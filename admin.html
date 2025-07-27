@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - Manage Nicknames</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      background-color: #0d1117;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+    }
+
+    h2 {
+      text-align: center;
+      color: #58a6ff;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      max-height: 400px;
+      overflow: hidden;
+      border-radius: 12px;
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0;
+    }
+
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 400px;
+      border-radius: 12px;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      min-width: 600px;
+      border-collapse: collapse;
+      color: #f8f8f8;
+      table-layout: auto;
+    }
+
+    thead {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(6px);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .delete-btn {
+      background: #ff4d4d;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+    }
+
+    .delete-btn:hover {
+      background: #cc0000;
+    }
+
+    #totalCount {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #00ffc3;
+      margin-top: 10px;
+    }
+
+    /* Sign-in Modal */
+    #signInModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .modal-content {
+      background: #161b22;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px #00000050;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .modal-content input {
+      padding: 10px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: white;
+    }
+
+    .modal-content button {
+      background: #238636;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .modal-content button:hover {
+      background: #2ea043;
+    }
+  </style>
+</head>
+<!-- Everything above <body> remains the same -->
+<body>
+  <div id="signInModal">
+    <div class="modal-content">
+      <h3>Admin Sign In</h3>
+      <input type="email" id="adminEmail" placeholder="Email" />
+      <input type="password" id="adminPassword" placeholder="Password" />
+      <button onclick="signIn()">Sign In</button>
+    </div>
+  </div>
+
+  <div class="container" style="display: none" id="adminContainer">
+    <h2>👮 Admin Panel - Nickname Monitor</h2>
+    <div id="totalCount">Loading...</div>
+    <div class="table-wrapper">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Nickname</th>
+              <th>Device ID</th>
+              <th>Date Submitted</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="nickTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDRQUnCtIZSpq4Jxed_4lwy9LYup37009c",
+      authDomain: "whatsapp-stuffs.firebaseapp.com",
+      projectId: "whatsapp-stuffs",
+      storageBucket: "whatsapp-stuffs.appspot.com",
+      messagingSenderId: "777872998496",
+      appId: "1:777872998496:web:ae4b7f2dc278a3c1aa0305"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    const nickTableBody = document.getElementById('nickTableBody');
+    const totalCount = document.getElementById('totalCount');
+    const adminContainer = document.getElementById('adminContainer');
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('signInModal').style.display = 'none';
+        adminContainer.style.display = 'block';
+        loadNicknames();
+      } else {
+        document.getElementById('signInModal').style.display = 'flex';
+        adminContainer.style.display = 'none';
+      }
+    });
+
+    function signIn() {
+      const email = document.getElementById('adminEmail').value;
+      const password = document.getElementById('adminPassword').value;
+
+      auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+          document.getElementById('signInModal').style.display = 'none';
+          adminContainer.style.display = 'block';
+        })
+        .catch(err => {
+          alert("Login failed: " + err.message);
+        });
+    }
+
+    async function loadNicknames() {
+      totalCount.textContent = "Loading...";
+      const snapshot = await db.collection("submissions").get();
+
+      const seen = new Set();
+      let count = 0;
+      nickTableBody.innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const nickname = (data.nickname || '').toLowerCase();
+        const deviceId = data.deviceId || 'N/A';
+        const date = data.date || '—';
+
+        const key = `${nickname}_${deviceId}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        count++;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${nickname}</td>
+          <td>${deviceId}</td>
+          <td>${date}</td>
+          <td><button class="delete-btn" onclick="deleteNickname('${nickname}')">Delete</button></td>
+        `;
+        nickTableBody.appendChild(row);
+      });
+
+      totalCount.textContent = `🧮 Total Unique Nicknames: ${count}`;
+    }
+
+    async function deleteNickname(nickname) {
+      nickname = nickname.toLowerCase();
+      if (!confirm(`Are you sure you want to delete and block nickname "${nickname}"?`)) return;
+
+      try {
+        const snapshot = await db.collection("submissions").where("nickname", "==", nickname).get();
+
+        const batch = db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        await db.collection("blocked_nicknames").doc(nickname).set({ blocked: true, timestamp: firebase.firestore.Timestamp.now() });
+
+        alert(`"${nickname}" has been deleted and blocked.`);
+        loadNicknames();
+      } catch (err) {
+        alert("Error deleting nickname: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

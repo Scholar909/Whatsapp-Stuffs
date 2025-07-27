@@ -1,0 +1,125 @@
+* {
+  box-sizing: border-box;
+  font-family: 'Segoe UI', 'Poppins', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+
+.container {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  width: 90%;
+  max-width: 600px;
+  padding: 30px 30px 40px;
+  color: #fff;
+  transition: all 0.3s ease-in-out;
+}
+
+.container:hover {
+  transform: scale(1.01);
+  box-shadow: 0 10px 35px rgba(255, 255, 255, 0.1);
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 1.8rem;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+
+label {
+  font-size: 0.95rem;
+  margin-top: 10px;
+  display: block;
+  color: #f1f1f1;
+  font-weight: 500;
+}
+
+input,
+textarea,
+button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+  transition: all 0.3s ease-in-out;
+}
+
+input,
+textarea {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8e8e8;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+input:focus,
+textarea:focus {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+button {
+  background: linear-gradient(135deg, #00c6ff, #0072ff);
+  color: #fff;
+  font-weight: bold;
+  margin-top: 20px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.3s ease-in-out, transform 0.2s;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #0072ff, #00c6ff);
+  transform: translateY(-2px);
+  box-shadow: 0 0 10px rgba(0, 198, 255, 0.4);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.pair {
+  margin-bottom: 20px;
+}
+
+#status {
+  margin-top: 20px;
+  font-size: 0.95rem;
+  text-align: center;
+  color: #ffcccc;
+  transition: all 0.3s ease-in-out;
+}
+
+#result a {
+  color: #66d9ef;
+  text-decoration: none;
+  font-weight: bold;
+  word-break: break-all;
+}
+
+#result textarea {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f2f2;
+}

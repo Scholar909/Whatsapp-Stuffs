@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Receive Link + Comment</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container">
+    <h2>Receive a Link to Post</h2>
+    <form id="receiveForm">
+      <label for="nickname">Enter Your Nickname:</label>
+      <input type="text" id="nickname" required />
+      <button type="submit">Get Link + Comment</button>
+    </form>
+
+    <div id="result" class="hidden">
+      <p><strong>Link:</strong> <a id="link" href="#" target="_blank"></a></p>
+      <p><strong>Comment:</strong></p>
+      <textarea id="comment" readonly></textarea>
+    </div>
+
+    <p id="status"></p>
+  </div>
+
+  <script type="module" src="receive.js"></script>
+</body>
+</html>
