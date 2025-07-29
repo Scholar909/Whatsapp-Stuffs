@@ -17,7 +17,7 @@ body {
 .container {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -86,7 +86,6 @@ button {
   font-weight: bold;
   margin-top: 20px;
   cursor: pointer;
-  border: none;
   transition: background 0.3s ease-in-out, transform 0.2s;
 }
 
@@ -100,28 +99,12 @@ button:active {
   transform: scale(0.98);
 }
 
-.pair {
-  margin-bottom: 20px;
-}
-
 #status {
   margin-top: 20px;
   font-size: 0.95rem;
   text-align: center;
   color: #ffcccc;
   transition: all 0.3s ease-in-out;
-}
-
-#result a {
-  color: #66d9ef;
-  text-decoration: none;
-  font-weight: bold;
-  word-break: break-all;
-}
-
-#result textarea {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f2f2f2;
 }
 
 /* === Review Grid Section === */
@@ -146,11 +129,6 @@ button:active {
 .review-box:hover {
   transform: translateY(-4px);
   background: rgba(255, 255, 255, 0.08);
-}
-
-.review-box p {
-  margin: 0;
-  font-weight: bold;
 }
 
 .review-box .view-btn {
@@ -205,7 +183,7 @@ button:active {
 
 .modal a {
   color: #66d9ef;
-  word-break: break-all;
+  word-break: break-word;
   font-weight: bold;
 }
 
