@@ -24,10 +24,19 @@ const db = getFirestore(app);
 
 // DOM Elements
 const form = document.getElementById('receiveForm');
-const linkElement = document.getElementById('link');
-const commentElement = document.getElementById('comment');
-const resultDiv = document.getElementById('result');
 const statusText = document.getElementById('status');
+const reviewsContainer = document.getElementById('reviewGrid'); // This will hold Review 1, 2, etc.
+
+// Modal elements (assume these exist in HTML)
+const modal = document.getElementById('modal');
+const modalLink = document.getElementById('modal-link');
+const modalComment = document.getElementById('modal-comment');
+const modalClose = document.getElementById('closeModal');
+
+// Close modal
+modalClose.addEventListener('click', () => {
+  modal.classList.add('hidden');
+});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -37,8 +46,7 @@ form.addEventListener('submit', async (e) => {
   if (!nickname) return;
 
   const today = new Date().toISOString().split("T")[0];
-  const localKey = `received_${nickname}_${today}`;
-  const cached = localStorage.getItem(localKey);
+  const localKey = `reviews_${nickname}_${today}`;
 
   // Step 0: Check if nickname has ever submitted anything
   const userSubmissionsQuery = query(
@@ -52,55 +60,37 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  // Step 1: Use cached pair if available
-  if (cached) {
-    const data = JSON.parse(cached);
-    showResult(data.link, data.comment);
-    return;
-  }
-
-  // Step 2: Check if already reviewed today in Firestore
-  const existingReviewQuery = query(
+  // Step 1: Load user’s today's reviews
+  const userReviewQuery = query(
     collection(db, "reviews"),
     where("nickname", "==", nickname),
     where("date", "==", today)
   );
+  const userReviewSnap = await getDocs(userReviewQuery);
 
-  const existingReviewSnap = await getDocs(existingReviewQuery);
-  if (!existingReviewSnap.empty) {
-    const existingData = existingReviewSnap.docs[0].data();
-    showResult(existingData.link, existingData.comment);
-    localStorage.setItem(localKey, JSON.stringify(existingData));
-    return;
-  }
+  const reviewedLinks = new Set();
+  const userReviewList = [];
 
-  // Step 3: Fetch review history from last 7 days for this user
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const historyQuery = query(
-    collection(db, "reviews"),
-    where("timestamp", ">=", Timestamp.fromDate(sevenDaysAgo))
-  );
-  const historySnap = await getDocs(historyQuery);
-
-  const globallyReviewedPairs = new Set();         // link|comment for global check
-  const userReviewedLinks = new Map();             // link => [comments] for this user
-
-  historySnap.forEach(doc => {
+  userReviewSnap.forEach(doc => {
     const data = doc.data();
-    const key = `${data.link}|${data.comment}`;
-    globallyReviewedPairs.add(key);
-
-    if (data.nickname === nickname) {
-      if (!userReviewedLinks.has(data.link)) {
-        userReviewedLinks.set(data.link, []);
-      }
-      userReviewedLinks.get(data.link).push(data.comment);
-    }
+    reviewedLinks.add(data.link); // prevent re-reviewing same link
+    userReviewList.push(data);
   });
 
-  // Step 4: Get today's submissions
+  // Step 2: Load global reviewed link|comment pairs (today only)
+  const globalReviewQuery = query(
+    collection(db, "reviews"),
+    where("date", "==", today)
+  );
+  const globalReviewSnap = await getDocs(globalReviewQuery);
+  const globallyUsedPairs = new Set();
+
+  globalReviewSnap.forEach(doc => {
+    const data = doc.data();
+    globallyUsedPairs.add(`${data.link}|${data.comment}`);
+  });
+
+  // Step 3: Load today’s submissions (excluding self)
   const submissionsQuery = query(
     collection(db, "submissions"),
     where("date", "==", today)
@@ -113,33 +103,25 @@ form.addEventListener('submit', async (e) => {
     const data = doc.data();
     const { link, comment } = data;
 
-    if (data.nickname === nickname) return; // ❌ Skip own submission
+    if (data.nickname === nickname) return;
 
     const pairKey = `${link}|${comment}`;
-    if (globallyReviewedPairs.has(pairKey)) return; // ❌ Already shown to someone
+    if (globallyUsedPairs.has(pairKey)) return; // used globally
+    if (reviewedLinks.has(link)) return; // user already got this link
 
-    if (!userReviewedLinks.has(link)) {
-      validOptions.push(data); // ✅ New link for this user
-    } else {
-      const seenComments = userReviewedLinks.get(link);
-      if (!seenComments.includes(comment)) {
-        validOptions.push(data); // ✅ New comment on familiar link
-      }
-    }
+    validOptions.push(data);
   });
 
-  // Step 5: Handle empty validOptions
+  // Step 4: Handle if no valid options
   if (validOptions.length === 0) {
-    statusText.textContent = "❌ No link+comment pair is available to post at the moment. Please come back later.";
+    statusText.textContent = "❌ No link+comment pair is available to assign. Please try again later.";
     return;
   }
 
-  // Step 6: Pick a random pair
+  // Step 5: Pick a new random valid pair
   const selected = validOptions[Math.floor(Math.random() * validOptions.length)];
-  showResult(selected.link, selected.comment);
-  localStorage.setItem(localKey, JSON.stringify(selected));
 
-  // Step 7: Save as reviewed in Firestore
+  // Step 6: Save to Firestore as new review
   await addDoc(collection(db, "reviews"), {
     nickname,
     link: selected.link,
@@ -147,12 +129,33 @@ form.addEventListener('submit', async (e) => {
     date: today,
     timestamp: Timestamp.now()
   });
+
+  // Step 7: Show in UI
+  userReviewList.push({
+    link: selected.link,
+    comment: selected.comment
+  });
+  reviewedLinks.add(selected.link);
+
+  renderReviewList(userReviewList);
+  statusText.textContent = "✅ New review assigned!";
 });
 
-function showResult(link, comment) {
-  linkElement.href = link;
-  linkElement.textContent = link;
-  commentElement.value = comment;
-  resultDiv.classList.remove("hidden");
-  statusText.textContent = "";
+// Function to render the review cards (Review 1, 2, ...)
+function renderReviewList(reviews) {
+  reviewsContainer.innerHTML = ''; // Clear all
+  reviews.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.className = 'review-box';
+    div.textContent = `Review ${index + 1}`;
+    div.dataset.link = item.link;
+    div.dataset.comment = item.comment;
+    div.addEventListener('click', () => {
+      modalLink.href = item.link;
+      modalLink.textContent = item.link;
+      modalComment.textContent = item.comment;
+      modal.classList.remove('hidden');
+    });
+    reviewsContainer.appendChild(div);
+  });
 }

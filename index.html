@@ -5,23 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Receive Link + Comment</title>
   <link rel="stylesheet" href="style.css"/>
+  <link href="https://unicons.iconscout.com/release/v4.0.8/css/line.css" rel="stylesheet"/>
 </head>
 <body>
-  <div class="container">
-    <h2>Receive a Link to Post</h2>
+  <div class="container glassy">
+    <h2>Receive a Link + Comment</h2>
+
     <form id="receiveForm">
       <label for="nickname">Enter Your Nickname:</label>
       <input type="text" id="nickname" required />
-      <button type="submit">Get Link + Comment</button>
+      <button type="submit">Get New Review</button>
     </form>
 
-    <div id="result" class="hidden">
-      <p><strong>Link:</strong> <a id="link" href="#" target="_blank"></a></p>
-      <p><strong>Comment:</strong></p>
-      <textarea id="comment" readonly></textarea>
+    <!-- Review Grid -->
+    <div id="reviewGrid" class="grid hidden">
+      <!-- Reviews dynamically inserted here -->
+      <!-- Example:
+      <div class="review-box" data-index="1">
+        <p>Review 1</p>
+        <button class="view-btn">View</button>
+      </div>
+      -->
     </div>
 
     <p id="status"></p>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal glassy">
+      <h3>Review Details</h3>
+      <p><strong>Link:</strong> <a id="modal-link" href="#" target="_blank"></a></p>
+      <p><strong>Comment:</strong></p>
+      <textarea id="modal-comment" readonly></textarea>
+      <button id="closeModal">Close</button>
+    </div>
   </div>
 
   <script type="module" src="receive.js"></script>
