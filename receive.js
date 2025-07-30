@@ -33,6 +33,7 @@ const modal = document.getElementById('modal');
 const modalLink = document.getElementById('modal-link');
 const modalComment = document.getElementById('modal-comment');
 const modalClose = document.getElementById('closeModal');
+const modalWarning = document.getElementById('modal-warning'); // NEW element for warning
 
 modalClose.addEventListener('click', () => {
   modal.classList.add('hidden');
@@ -64,7 +65,10 @@ form.addEventListener('submit', async (e) => {
   }
 
   const nickname = lockedNickname;
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 6); // 7 days including today
 
   // Step 0: Check if nickname has ever submitted anything
   const userSubmissionsQuery = query(
@@ -77,20 +81,26 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  // Step 1: Load today's user reviews
+  // Step 1: Load all user reviews (this week and today)
   const userReviewQuery = query(
     collection(db, "reviews"),
-    where("nickname", "==", nickname),
-    where("date", "==", today)
+    where("nickname", "==", nickname)
   );
   const userReviewSnap = await getDocs(userReviewQuery);
-  const reviewedLinks = new Set();
+  const reviewedLinks = new Set(); // for today
+  const reviewedLinksThisWeek = new Set(); // for 7 days
   const userReviewList = [];
 
   userReviewSnap.forEach(doc => {
     const data = doc.data();
-    reviewedLinks.add(data.link);
-    userReviewList.push(data);
+    const reviewDate = new Date(data.date);
+    if (data.date === today) {
+      reviewedLinks.add(data.link); // today's links
+      userReviewList.push(data);
+    }
+    if (reviewDate >= weekAgo) {
+      reviewedLinksThisWeek.add(data.link); // any link in past week
+    }
   });
 
   // Step 2: Load all today's reviewed pairs (globally)
@@ -122,7 +132,14 @@ form.addEventListener('submit', async (e) => {
 
     const pairKey = `${link}|${comment}`;
     if (globallyUsedPairs.has(pairKey)) return;
-    if (reviewedLinks.has(link)) return;
+    if (reviewedLinks.has(link)) return; // already received today
+
+    // 98% chance to avoid same link in the last 7 days
+    if (reviewedLinksThisWeek.has(link)) {
+      const chance = Math.random();
+      if (chance < 0.98) return;
+      data._showRepeatWarning = true; // mark for UI
+    }
 
     validOptions.push(data);
   });
@@ -148,7 +165,8 @@ form.addEventListener('submit', async (e) => {
   // Step 7: Update UI
   userReviewList.push({
     link: selected.link,
-    comment: selected.comment
+    comment: selected.comment,
+    _showRepeatWarning: selected._showRepeatWarning || false
   });
   reviewedLinks.add(selected.link);
 
@@ -165,12 +183,24 @@ function renderReviewList(reviews) {
     div.textContent = `Review ${index + 1}`;
     div.dataset.link = item.link;
     div.dataset.comment = item.comment;
+
+    // Attach modal view logic
     div.addEventListener('click', () => {
       modalLink.href = item.link;
       modalLink.textContent = item.link;
       modalComment.textContent = item.comment;
+
+      if (item._showRepeatWarning) {
+        modalWarning.textContent = "⚠️ You've received this link before. Please ensure to use a different email from the last or share it to a friend so they can do the review for you. Thank you ❤️, And God Bless You 🙏.";
+        modalWarning.classList.remove('hidden');
+      } else {
+        modalWarning.textContent = '';
+        modalWarning.classList.add('hidden');
+      }
+
       modal.classList.remove('hidden');
     });
+
     reviewsContainer.appendChild(div);
   });
 }
