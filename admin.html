@@ -227,80 +227,83 @@
     async function loadNicknames() {
       totalCount.textContent = "Loading...";
       nickTableBody.innerHTML = "";
-      const seen = new Set();
-      let count = 0;
-
       const today = new Date().toISOString().split("T")[0];
+      let count = 0;
 
       const submissionsSnap = await db.collection("submissions").get();
       const receivesSnap = await db.collection("reviews").get();
 
-      const submitMap = {};
-      const receiveMap = {};
+      const mergedMap = new Map();
 
+      // Process submissions
       submissionsSnap.forEach(doc => {
         const d = doc.data();
-        const nick = (d.nickname || '').toLowerCase();
-        const key = `${nick}_${d.deviceId}`;
-        submitMap[key] = (submitMap[key] || 0) + 1;
-      });
+        const nickname = (d.nickname || '').toLowerCase();
+        const deviceId = d.deviceId || 'Temporary';
 
-      receivesSnap.forEach(doc => {
-        const d = doc.data();
-        const nick = (d.nickname || '').toLowerCase();
-        const date = (d.date || '').split("T")[0];
-        if (date === today) {
-          const key = `${nick}_${d.deviceId}`;
-          receiveMap[key] = (receiveMap[key] || 0) + 1;
+        if (!mergedMap.has(nickname)) {
+          mergedMap.set(nickname, {
+            nickname,
+            deviceId,
+            submitted: 0,
+            received: 0
+          });
+        }
+
+        const record = mergedMap.get(nickname);
+        record.submitted += 1;
+
+        // Prefer permanent device ID
+        if (deviceId !== 'Temporary' && record.deviceId === 'Temporary') {
+          record.deviceId = deviceId;
         }
       });
 
-      // Combine unique entries from both submissions and receives
-      const keys = new Set([...Object.keys(submitMap), ...Object.keys(receiveMap)]);
+      // Process receives (only today)
+      receivesSnap.forEach(doc => {
+        const d = doc.data();
+        const nickname = (d.nickname || '').toLowerCase();
+        const date = (d.date || '').split("T")[0];
+        if (date !== today) return;
 
-      for (let key of keys) {
-        const [nickname, deviceId] = key.split("_");
+        const deviceId = d.deviceId || 'Temporary';
+
+        if (!mergedMap.has(nickname)) {
+          mergedMap.set(nickname, {
+            nickname,
+            deviceId,
+            submitted: 0,
+            received: 0
+          });
+        }
+
+        const record = mergedMap.get(nickname);
+        record.received += 1;
+
+        // Prefer permanent device ID
+        if (deviceId !== 'Temporary' && record.deviceId === 'Temporary') {
+          record.deviceId = deviceId;
+        }
+      });
+
+      // Render table
+      mergedMap.forEach(data => {
         const row = document.createElement("tr");
+        if (data.deviceId === "Temporary" && data.submitted === 0) {
+          row.classList.add("temporary-nickname");
+        }
 
         row.innerHTML = `
-          <td>${nickname}</td>
-          <td>${deviceId}</td>
+          <td>${data.nickname}</td>
+          <td>${data.deviceId}</td>
           <td>${today}</td>
-          <td>${submitMap[key] || 0}</td>
-          <td>${receiveMap[key] || 0}</td>
-          <td><button class="delete-btn" onclick="deleteNickname('${nickname}')">Delete</button></td>
-        `;
-
-        nickTableBody.appendChild(row);
-        count++;
-      }
-
-      // Add sessionStorage temporary nicknames
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (!key.startsWith("temp_")) continue;
-
-        const value = JSON.parse(sessionStorage.getItem(key));
-        const nickname = (value.nickname || '').toLowerCase();
-        const deviceId = value.deviceId || 'unknown';
-        const receiveCount = value.receiveCount || 0;
-
-        const uniqueKey = `${nickname}_${deviceId}`;
-        if (keys.has(uniqueKey)) continue; // already shown
-
-        const row = document.createElement("tr");
-        row.classList.add("temporary-nickname");
-        row.innerHTML = `
-          <td>${nickname}</td>
-          <td>${deviceId}</td>
-          <td>${today}</td>
-          <td>0</td>
-          <td>${receiveCount}</td>
-          <td><button class="delete-btn" onclick="deleteNickname('${nickname}')">Delete</button></td>
+          <td>${data.submitted}</td>
+          <td>${data.received}</td>
+          <td><button class="delete-btn" onclick="deleteNickname('${data.nickname}')">Delete</button></td>
         `;
         nickTableBody.appendChild(row);
         count++;
-      }
+      });
 
       totalCount.textContent = `🧮 Total Unique Nicknames: ${count}`;
     }
@@ -315,7 +318,10 @@
         snapshot.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
 
-        await db.collection("blocked_nicknames").doc(nickname).set({ blocked: true, timestamp: firebase.firestore.Timestamp.now() });
+        await db.collection("blocked_nicknames").doc(nickname).set({
+          blocked: true,
+          timestamp: firebase.firestore.Timestamp.now()
+        });
 
         alert(`"${nickname}" has been deleted and blocked.`);
         loadNicknames();
