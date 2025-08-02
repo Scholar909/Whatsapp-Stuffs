@@ -15,7 +15,7 @@
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1000px;
       margin: 50px auto;
       padding: 20px;
       background: rgba(255,255,255,0.03);
@@ -31,7 +31,7 @@
 
     .table-wrapper {
       width: 100%;
-      max-height: 400px;
+      max-height: 500px;
       overflow: hidden;
       border-radius: 12px;
       margin-top: 20px;
@@ -43,7 +43,7 @@
       width: 100%;
       overflow-x: auto;
       overflow-y: auto;
-      max-height: 400px;
+      max-height: 500px;
       border-radius: 12px;
       scroll-behavior: smooth;
       -webkit-overflow-scrolling: touch;
@@ -51,7 +51,7 @@
 
     table {
       width: 100%;
-      min-width: 600px;
+      min-width: 800px;
       border-collapse: collapse;
       color: #f8f8f8;
       table-layout: auto;
@@ -98,7 +98,10 @@
       margin-top: 10px;
     }
 
-    /* Sign-in Modal */
+    tr.temporary-nickname {
+      border-left: 6px solid #58a6ff;
+    }
+
     #signInModal {
       position: fixed;
       inset: 0;
@@ -143,7 +146,6 @@
     }
   </style>
 </head>
-<!-- Everything above <body> remains the same -->
 <body>
   <div id="signInModal">
     <div class="modal-content">
@@ -165,6 +167,8 @@
               <th>Nickname</th>
               <th>Device ID</th>
               <th>Date Submitted</th>
+              <th>Submitted</th>
+              <th>Received</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -174,7 +178,6 @@
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
@@ -223,32 +226,81 @@
 
     async function loadNicknames() {
       totalCount.textContent = "Loading...";
-      const snapshot = await db.collection("submissions").get();
-
+      nickTableBody.innerHTML = "";
       const seen = new Set();
       let count = 0;
-      nickTableBody.innerHTML = "";
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const nickname = (data.nickname || '').toLowerCase();
-        const deviceId = data.deviceId || 'N/A';
-        const date = data.date || '—';
+      const today = new Date().toISOString().split("T")[0];
 
-        const key = `${nickname}_${deviceId}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        count++;
+      const submissionsSnap = await db.collection("submissions").get();
+      const receivesSnap = await db.collection("reviews").get();
 
+      const submitMap = {};
+      const receiveMap = {};
+
+      submissionsSnap.forEach(doc => {
+        const d = doc.data();
+        const nick = (d.nickname || '').toLowerCase();
+        const key = `${nick}_${d.deviceId}`;
+        submitMap[key] = (submitMap[key] || 0) + 1;
+      });
+
+      receivesSnap.forEach(doc => {
+        const d = doc.data();
+        const nick = (d.nickname || '').toLowerCase();
+        const date = (d.date || '').split("T")[0];
+        if (date === today) {
+          const key = `${nick}_${d.deviceId}`;
+          receiveMap[key] = (receiveMap[key] || 0) + 1;
+        }
+      });
+
+      // Combine unique entries from both submissions and receives
+      const keys = new Set([...Object.keys(submitMap), ...Object.keys(receiveMap)]);
+
+      for (let key of keys) {
+        const [nickname, deviceId] = key.split("_");
         const row = document.createElement("tr");
+
         row.innerHTML = `
           <td>${nickname}</td>
           <td>${deviceId}</td>
-          <td>${date}</td>
+          <td>${today}</td>
+          <td>${submitMap[key] || 0}</td>
+          <td>${receiveMap[key] || 0}</td>
+          <td><button class="delete-btn" onclick="deleteNickname('${nickname}')">Delete</button></td>
+        `;
+
+        nickTableBody.appendChild(row);
+        count++;
+      }
+
+      // Add sessionStorage temporary nicknames
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (!key.startsWith("temp_")) continue;
+
+        const value = JSON.parse(sessionStorage.getItem(key));
+        const nickname = (value.nickname || '').toLowerCase();
+        const deviceId = value.deviceId || 'unknown';
+        const receiveCount = value.receiveCount || 0;
+
+        const uniqueKey = `${nickname}_${deviceId}`;
+        if (keys.has(uniqueKey)) continue; // already shown
+
+        const row = document.createElement("tr");
+        row.classList.add("temporary-nickname");
+        row.innerHTML = `
+          <td>${nickname}</td>
+          <td>${deviceId}</td>
+          <td>${today}</td>
+          <td>0</td>
+          <td>${receiveCount}</td>
           <td><button class="delete-btn" onclick="deleteNickname('${nickname}')">Delete</button></td>
         `;
         nickTableBody.appendChild(row);
-      });
+        count++;
+      }
 
       totalCount.textContent = `🧮 Total Unique Nicknames: ${count}`;
     }
@@ -259,7 +311,6 @@
 
       try {
         const snapshot = await db.collection("submissions").where("nickname", "==", nickname).get();
-
         const batch = db.batch();
         snapshot.forEach(doc => batch.delete(doc.ref));
         await batch.commit();

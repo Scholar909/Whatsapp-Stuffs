@@ -33,7 +33,7 @@ const modal = document.getElementById('modal');
 const modalLink = document.getElementById('modal-link');
 const modalComment = document.getElementById('modal-comment');
 const modalClose = document.getElementById('closeModal');
-const modalWarning = document.getElementById('modal-warning'); // NEW element for warning
+const modalWarning = document.getElementById('modal-warning');
 
 modalClose.addEventListener('click', () => {
   modal.classList.add('hidden');
@@ -42,10 +42,15 @@ modalClose.addEventListener('click', () => {
 // Load previously received reviews on page load
 window.addEventListener('DOMContentLoaded', async () => {
   const lockedNickname = localStorage.getItem("lockedNickname");
-  if (!lockedNickname) return;
+  const tempNickname = sessionStorage.getItem("tempNickname");
 
-  nicknameInput.value = lockedNickname;
-  await loadAndRenderReviews(lockedNickname);
+  if (lockedNickname) {
+    nicknameInput.value = lockedNickname;
+    await loadAndRenderReviews(lockedNickname);
+  } else if (tempNickname) {
+    nicknameInput.value = tempNickname;
+    await loadAndRenderReviews(tempNickname);
+  }
 });
 
 form.addEventListener('submit', async (e) => {
@@ -54,17 +59,20 @@ form.addEventListener('submit', async (e) => {
   const enteredNickname = nicknameInput.value.trim().toLowerCase();
   const lockedNickname = localStorage.getItem("lockedNickname");
 
-  if (!lockedNickname) {
-    statusText.textContent = "❌ You must first submit a link and comment pair before receiving reviews.";
-    return;
-  }
-
-  if (enteredNickname !== lockedNickname) {
+  // If nickname is locked, enforce it
+  if (lockedNickname && enteredNickname !== lockedNickname) {
     statusText.textContent = `❌ This device is locked to nickname: "${lockedNickname}".`;
     return;
   }
 
-  const nickname = lockedNickname;
+  // Use locked nickname if available, else fallback to entered one
+  const nickname = lockedNickname || enteredNickname;
+
+  // If no locked nickname, store in session temporarily
+  if (!lockedNickname) {
+    sessionStorage.setItem("tempNickname", nickname);
+  }
+
   const now = new Date();
   const today = now.toISOString().split("T")[0];
   const weekAgo = new Date(now);
@@ -76,10 +84,7 @@ form.addEventListener('submit', async (e) => {
     where("nickname", "==", nickname)
   );
   const userSubmissionsSnap = await getDocs(userSubmissionsQuery);
-  if (userSubmissionsSnap.empty) {
-    statusText.textContent = "❌ Nickname not found or hasn't submitted anything.";
-    return;
-  }
+  const hasSubmittedBefore = !userSubmissionsSnap.empty;
 
   // Step 1: Load all user reviews (this week and today)
   const userReviewQuery = query(
@@ -87,23 +92,23 @@ form.addEventListener('submit', async (e) => {
     where("nickname", "==", nickname)
   );
   const userReviewSnap = await getDocs(userReviewQuery);
-  const reviewedLinks = new Set(); // for today
-  const reviewedLinksThisWeek = new Set(); // for 7 days
+  const reviewedLinks = new Set();
+  const reviewedLinksThisWeek = new Set();
   const userReviewList = [];
 
   userReviewSnap.forEach(doc => {
     const data = doc.data();
     const reviewDate = new Date(data.date);
     if (data.date === today) {
-      reviewedLinks.add(data.link); // today's links
+      reviewedLinks.add(data.link);
       userReviewList.push(data);
     }
     if (reviewDate >= weekAgo) {
-      reviewedLinksThisWeek.add(data.link); // any link in past week
+      reviewedLinksThisWeek.add(data.link);
     }
   });
 
-  // Step 2: Load all today's reviewed pairs (globally)
+  // Step 2: Load all today's reviewed pairs globally
   const globalReviewQuery = query(
     collection(db, "reviews"),
     where("date", "==", today)
@@ -132,13 +137,12 @@ form.addEventListener('submit', async (e) => {
 
     const pairKey = `${link}|${comment}`;
     if (globallyUsedPairs.has(pairKey)) return;
-    if (reviewedLinks.has(link)) return; // already received today
+    if (reviewedLinks.has(link)) return;
 
-    // 98% chance to avoid same link in the last 7 days
     if (reviewedLinksThisWeek.has(link)) {
       const chance = Math.random();
       if (chance < 0.98) return;
-      data._showRepeatWarning = true; // mark for UI
+      data._showRepeatWarning = true;
     }
 
     validOptions.push(data);
@@ -184,7 +188,6 @@ function renderReviewList(reviews) {
     div.dataset.link = item.link;
     div.dataset.comment = item.comment;
 
-    // Attach modal view logic
     div.addEventListener('click', () => {
       modalLink.href = item.link;
       modalLink.textContent = item.link;
@@ -205,7 +208,7 @@ function renderReviewList(reviews) {
   });
 }
 
-// Auto-load reviews on page load
+// Load reviews by nickname
 async function loadAndRenderReviews(nickname) {
   const today = new Date().toISOString().split("T")[0];
   const reviewQuery = query(
